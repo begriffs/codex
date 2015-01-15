@@ -8,6 +8,7 @@ import Data.List
 import Data.String.Utils
 import Data.Traversable (traverse)
 import Distribution.Text
+import Network.Socket (withSocketsDo)
 import Paths_codex (version)
 import System.Directory
 import System.Environment
@@ -102,7 +103,7 @@ help = putStrLn $
           , "Note: codex will browse the parent directory for cabal projects and use them as dependency over hackage when possible." ]
 
 main :: IO ()
-main = do
+main = withSocketsDo $ do
   cx    <- loadConfig
   args  <- getArgs
   run cx args where

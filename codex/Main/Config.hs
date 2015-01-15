@@ -22,9 +22,7 @@ instance ToJSON Codex
 instance FromJSON Codex
 
 getConfigPath :: IO FilePath
-getConfigPath = do
-  homedir <- getHomeDirectory
-  return $ homedir </> ".codex"
+getConfigPath = getAppUserDataDirectory "codex"
 
 checkConfig :: Codex -> IO ConfigState
 checkConfig cx = do

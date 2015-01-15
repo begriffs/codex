@@ -1,7 +1,8 @@
 module Codex (Codex(..), defaultTagsFileName, Verbosity, module Codex) where
 
-import Control.Exception (try, SomeException)
 import Control.Applicative ((<$>))
+import Control.Exception (try, tryJust, SomeException)
+import Control.Lens (view)
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Either
@@ -14,7 +15,7 @@ import Distribution.Package
 import Distribution.PackageDescription
 import Distribution.Text
 import Distribution.Verbosity
-import Network.Curl.DownloadLazy
+import Network.HTTP.Client (HttpException(..))
 import System.Directory
 import System.Directory.Machine (files, directoryWalk)
 import System.FilePath
@@ -27,6 +28,7 @@ import qualified Data.List as List
 import qualified Data.Text as Text
 import qualified Data.Text.Lazy as TextL
 import qualified Data.Text.Lazy.IO as TLIO
+import qualified Network.Wreq as Wreq
 
 import Codex.Internal
 import Codex.Project
@@ -49,10 +51,10 @@ data Tagger = Ctags | Hasktags | HasktagsEmacs | HasktagsExtended
   deriving (Eq, Show, Read)
 
 taggerCmd :: Tagger -> String
-taggerCmd Ctags = "ctags --tag-relative=no --recurse -f '$TAGS' '$SOURCES'"
-taggerCmd Hasktags = "hasktags --ctags --output='$TAGS' '$SOURCES'"
-taggerCmd HasktagsEmacs = "hasktags --etags --output='$TAGS' '$SOURCES'"
-taggerCmd HasktagsExtended = "hasktags --ctags --extendedctag --output='$TAGS' '$SOURCES'"
+taggerCmd Ctags = "ctags --tag-relative=no --recurse -f \"$TAGS\" \"$SOURCES\""
+taggerCmd Hasktags = "hasktags --ctags --output=\"$TAGS\" \"$SOURCES\""
+taggerCmd HasktagsEmacs = "hasktags --etags --output=\"$TAGS\" \"$SOURCES\""
+taggerCmd HasktagsExtended = "hasktags --ctags --extendedctag --output=\"$TAGS\" \"$SOURCES\""
 
 taggerCmdRun :: Codex -> FilePath -> FilePath -> Action FilePath
 taggerCmdRun cx sources tags = do
@@ -115,6 +117,12 @@ fetch cx i = do
     archivePath = packageArchive cx i
     url = packageUrl i
 
+openLazyURI :: String -> IO (Either String BS.ByteString)
+openLazyURI uri = tryJust handleStatus (fmap (view Wreq.responseBody) (Wreq.get uri)) where
+  handleStatus (InvalidUrlException _ _) = Just $ "Invalid URL: " ++ uri
+  -- TODO handle more cases of HttpException
+  handleStatus _ = Nothing
+
 extract :: Codex -> PackageIdentifier -> Action FilePath
 extract cx i = fmap (const path) . tryIO $ read path (packageArchive cx i) where
   read dir tar = Tar.unpack dir . Tar.read . GZip.decompress =<< BS.readFile tar
@@ -142,7 +150,7 @@ assembly cx dependencies projectHash workspaceProjects o = do
       let xs = concat $ fmap TextL.lines contents
       let ys = if sorted then List.sort xs else xs
       TLIO.writeFile o $ TextL.unlines (concat [headers, ys])
-    tags i = packageTags cx i
+    tags = packageTags cx
     headers = if tagsFileHeader cx then fmap TextL.pack [headerFormat, headerSorted, headerHash] else []
     headerFormat = "!_TAG_FILE_FORMAT\t2"
     headerSorted = concat ["!_TAG_FILE_SORTED\t", if sorted then "1" else "0"]
