@@ -2,10 +2,12 @@ module Codex (Codex(..), defaultTagsFileName, Verbosity, module Codex) where
 
 import Control.Applicative ((<$>))
 import Control.Exception (try, tryJust, SomeException)
-import Control.Lens (view)
+import Control.Lens ((^.))
+import Control.Lens.Review (bimap)
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Either
+import Data.Functor ((<$>))
 import Data.Hash.MD5
 import Data.Machine
 import Data.Maybe
@@ -118,10 +120,9 @@ fetch cx i = do
     url = packageUrl i
 
 openLazyURI :: String -> IO (Either String BS.ByteString)
-openLazyURI uri = tryJust handleStatus (fmap (view Wreq.responseBody) (Wreq.get uri)) where
-  handleStatus (InvalidUrlException _ _) = Just $ "Invalid URL: " ++ uri
-  -- TODO handle more cases of HttpException
-  handleStatus _ = Nothing
+openLazyURI uri = bimap showHttpEx (^. Wreq.responseBody) <$> try (Wreq.get uri) where
+  showHttpEx :: HttpException -> String
+  showHttpEx = show
 
 extract :: Codex -> PackageIdentifier -> Action FilePath
 extract cx i = fmap (const path) . tryIO $ read path (packageArchive cx i) where
