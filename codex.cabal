@@ -71,6 +71,7 @@ executable codex
     , MissingH
     , monad-loops         >= 0.4.2      && < 0.5
     , network             >= 2.6        && < 2.7
+    , wreq
     , yaml                >= 0.8.8.3    && < 0.9
     , codex               == 0.2.1.5
 

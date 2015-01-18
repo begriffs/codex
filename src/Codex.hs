@@ -7,7 +7,6 @@ import Control.Lens.Review (bimap)
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Either
-import Data.Functor ((<$>))
 import Data.Hash.MD5
 import Data.Machine
 import Data.Maybe
@@ -29,7 +28,8 @@ import qualified Data.List as List
 import qualified Data.Text as Text
 import qualified Data.Text.Lazy as TextL
 import qualified Data.Text.Lazy.IO as TLIO
-import qualified Network.Wreq as Wreq
+import qualified Network.Wreq as W
+import qualified Network.Wreq.Session as WS
 
 import Codex.Internal
 import Codex.Project
@@ -108,18 +108,18 @@ status cx i = do
     (_, True) -> return Archive
     (_, _)    -> return Remote
 
-fetch :: Codex -> PackageIdentifier -> Action FilePath
-fetch cx i = do
+fetch :: WS.Session -> Codex -> PackageIdentifier -> Action FilePath
+fetch s cx i = do
   bs <- tryIO $ do
     createDirectoryIfMissing True (packagePath cx i)
-    openLazyURI url
+    openLazyURI s url
   either left write bs where
     write bs = fmap (const archivePath) $ tryIO $ BS.writeFile archivePath bs
     archivePath = packageArchive cx i
     url = packageUrl i
 
-openLazyURI :: String -> IO (Either String BS.ByteString)
-openLazyURI uri = bimap showHttpEx (^. Wreq.responseBody) <$> try (Wreq.get uri) where
+openLazyURI :: WS.Session -> String -> IO (Either String BS.ByteString)
+openLazyURI s = fmap (bimap showHttpEx (^. W.responseBody)) . try . WS.get s where
   showHttpEx :: HttpException -> String
   showHttpEx = show
 
