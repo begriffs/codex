@@ -14,10 +14,9 @@ import Data.Maybe
 import Data.Traversable (traverse)
 import Data.String.Utils hiding (join)
 import Distribution.Package
-import Distribution.PackageDescription
 import Distribution.Text
 import Distribution.Verbosity
-import Network.HTTP.Client (HttpException(..))
+import Network.HTTP.Client (HttpException)
 import System.Directory
 import System.Directory.Machine (files, directoryWalk)
 import System.FilePath
